@@ -1,8 +1,8 @@
 <?php
 
+use Carbon\Carbon;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
 
 return new class extends Migration
 {
@@ -64,18 +64,18 @@ return new class extends Migration
                 'enable_textlocal' => true,
                 'textlocal_api_key' => null,
                 'enable_greensms' => true,
-                'greensms_access_token' => null,
-                'greensms_access_token_key' => null,
-                'sms_sender_id' => null,
-                'sms_entity_id' => null,
-                'sms_dlt_id' => null,
-                'sms_message_template' => null,
+                'greensms_access_token' => '9UJI3Q66LF10989',
+                'greensms_access_token_key' => '7Frj/LeP5HT&i1gE9bx)D4h28Jw0UmZ(',
+                'sms_sender_id' => 'GRNLLP',
+                'sms_entity_id' => '1701174193705338165',
+                'sms_dlt_id' => '1707174244761113638',
+                'sms_message_template' => '{code} is your OTP for login . OTP is valid for 8 minutes. Do not share this OTP with anyone. Powered by Greencreon LLP',
                 'maintenance_mode_web' => false,
                 'maintenance_mode_app' => false,
                 'check_device_id_on_registration' => false,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]
+            ],
         ]);
     }
 
