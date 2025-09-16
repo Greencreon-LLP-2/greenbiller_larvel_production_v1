@@ -44,6 +44,6 @@ class Supplier extends Model
 
     public function balances()
     {
-        return $this->hasOne(SupplierBalance::class, 'supplier_id');
+        return $this->hasOne(SupplierBalance::class, 'id');
     }
 }

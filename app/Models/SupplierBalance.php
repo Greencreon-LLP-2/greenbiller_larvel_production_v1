@@ -1,4 +1,3 @@
-namespace App\Models;
 
 <?php
 
