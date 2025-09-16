@@ -1,7 +1,15 @@
 <?php
 
-use App\Http\Controllers\Api\V1\UserApiControlller;
+
+use Laravel\Passport\Http\Controllers\AccessTokenController;
+use Laravel\Passport\Http\Controllers\AuthorizedAccessTokenController;
+use Laravel\Passport\Http\Controllers\TransientTokenController;
 use Illuminate\Support\Facades\Route;
+
+Route::post('/oauth/token', [AccessTokenController::class, 'issueToken']);
+Route::get('/oauth/tokens', [AuthorizedAccessTokenController::class, 'forUser']);
+Route::delete('/oauth/tokens/{token_id}', [AuthorizedAccessTokenController::class, 'destroy']);
+Route::post('/oauth/token/refresh', [TransientTokenController::class, 'refresh']);
 
 // This route will be accessible at: /api/
 Route::get('/', function () {
@@ -16,5 +24,7 @@ Route::get('/', function () {
 
 // This route will be accessible at: /api/v1/test
 Route::prefix('v1')->group(function () {
-    Route::get('/test', [UserApiControlller::class, 'index']);
+   Route::prefix('registration')->group(function () {
+        require base_path('routes/user/api_registration.php');
+    });
 });

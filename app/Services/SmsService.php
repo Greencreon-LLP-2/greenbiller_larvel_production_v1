@@ -8,7 +8,7 @@ class SmsService
 {
     public function send($mobile, $msg)
     {
-        $siteData = DB::table('site_config')->where('id', 1)->first();
+        $siteData = DB::table('core_settings')->where('id', 1)->first();
 
         if (!$siteData) {
             return false;
@@ -30,7 +30,7 @@ class SmsService
                 'expire' => $expire,
                 'authSignature' => $signature,
                 'route' => "transactional",
-                'smsHeader' => $siteData->sms_senderid,
+                'smsHeader' => $siteData->sms_sender_id,
                 'messageContent' => $msg,
                 'recipients' => $mobile,
                 'contentType' => "text",
@@ -54,7 +54,6 @@ class SmsService
 
             return $response;
         }
-
         return false;
     }
 }

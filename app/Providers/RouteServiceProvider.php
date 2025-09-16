@@ -5,18 +5,16 @@ namespace App\Providers;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Route;
 
+
 class RouteServiceProvider extends ServiceProvider
 {
-    /**
-     * The path to your application's "home" route.
-     */
+   
     public const HOME = '/home';
 
-    /**
-     * Define your route model bindings, pattern filters, etc.
-     */
+  
     public function boot(): void
     {
+        
         $this->configureRateLimiting();
 
         $this->routes(function () {
