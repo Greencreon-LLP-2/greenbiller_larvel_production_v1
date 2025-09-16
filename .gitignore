@@ -1,0 +1,49 @@
+# Laravel core
+/vendor
+/node_modules
+/public/storage
+/storage/*.key
+/.idea
+/.vscode
+/.phpunit.result.cache
+
+# Laravel environment
+.env
+.env.local
+.env.*.backup
+
+# Laravel log & cache
+/storage/logs
+/storage/framework/cache/data
+/storage/framework/sessions
+/storage/framework/views
+
+# Docker
+docker/php/php.ini
+docker/nginx/default.conf
+docker-compose.override.yml
+*.docker-compose.override.yml
+docker/mysql_data
+*.tar
+*.log
+
+# Composer
+composer.lock
+
+# Node / Vite / NPM / Yarn
+package-lock.json
+yarn.lock
+npm-debug.log
+yarn-error.log
+
+# OS generated
+.DS_Store
+Thumbs.db
+
+# IDEs
+.idea/
+.vscode/
+
+# Others
+*.swp
+*.swo
