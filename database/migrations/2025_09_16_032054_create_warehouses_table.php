@@ -17,10 +17,8 @@ return new class extends Migration {
             $table->string('email', 100)->nullable();
             $table->enum('status', ['active', 'inactive'])->default('active');
             $table->timestamps();
-
             // Index
             $table->index('store_id', 'idx_warehouses_store');
-
             // Foreign key
             $table->foreign('store_id', 'fk_warehouses_store')
                 ->references('id')->on('stores')
