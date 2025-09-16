@@ -21,12 +21,10 @@ return new class extends Migration
             $table->unsignedBigInteger('currency_id')->nullable();
             $table->tinyInteger('active')->default(1);
             $table->timestamps();
-
             $table->unique(
                 ['item_id', 'store_id', 'warehouse_id', 'customer_group_id', 'price_type', 'valid_from'],
                 'uq_item_price'
             );
-
             $table->index('item_id', 'idx_item_prices_item');
             $table->index('store_id', 'idx_item_prices_store');
 

@@ -5,7 +5,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    public function up(): void {
+    public function up(): void
+    {
         Schema::create('packages', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->unsignedBigInteger('store_id');
@@ -22,14 +23,13 @@ return new class extends Migration {
             $table->timestamps();
 
             $table->unique(['store_id', 'package_code'], 'uq_package_code');
-            $table->index('store_id', 'idx_packages_store_id');
-
             $table->foreign('store_id')->references('id')->on('stores')->onDelete('cascade');
             $table->foreign('billing_cycle_id')->references('id')->on('billing_cycles');
         });
     }
 
-    public function down(): void {
+    public function down(): void
+    {
         Schema::dropIfExists('packages');
     }
 };

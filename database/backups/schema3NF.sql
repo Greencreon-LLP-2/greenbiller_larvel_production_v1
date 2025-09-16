@@ -256,6 +256,86 @@ CREATE TABLE
         UNIQUE KEY uq_address_entity (address_id, entity_type, entity_id)
     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+CREATE TABLE
+    customers (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        store_id BIGINT UNSIGNED NOT NULL,
+        created_by BIGINT UNSIGNED DEFAULT NULL,
+        country_id BIGINT UNSIGNED NOT NULL,
+        group_id BIGINT UNSIGNED DEFAULT NULL,
+        customer_code VARCHAR(100) NOT NULL,
+        customer_name VARCHAR(255) NOT NULL,
+        mobile VARCHAR(20) DEFAULT NULL,
+        phone VARCHAR(20) DEFAULT NULL,
+        email VARCHAR(255) DEFAULT NULL,
+        gst_enabled TINYINT (1) NOT NULL DEFAULT 0,
+        gstin VARCHAR(50) DEFAULT NULL,
+        vat_enabled TINYINT (1) NOT NULL DEFAULT 0,
+        vatin VARCHAR(50) DEFAULT NULL,
+        tax_number VARCHAR(50) DEFAULT NULL,
+        credit_limit DECIMAL(12, 2) DEFAULT 0.00,
+        credit_date_limit DATE DEFAULT NULL,
+        price_level_type ENUM ('retail', 'wholesale', 'custom') DEFAULT 'retail',
+        price_level_value DECIMAL(12, 2) DEFAULT 0.00,
+        delete_bit TINYINT (1) NOT NULL DEFAULT 0,
+        status ENUM ('active', 'inactive') DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_customer_code (store_id, customer_code),
+        INDEX idx_customers_store_id (store_id),
+        INDEX idx_customers_created_by (created_by),
+        INDEX idx_customers_country_id (country_id),
+        CONSTRAINT fk_customers_store FOREIGN KEY (store_id) REFERENCES stores (id) ON DELETE CASCADE,
+        CONSTRAINT fk_customers_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL,
+        CONSTRAINT fk_customers_country FOREIGN KEY (country_id) REFERENCES country_settings (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_customers_group FOREIGN KEY (group_id) REFERENCES customer_groups (id) ON DELETE SET NULL
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE
+    customer_attachments (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        customer_id BIGINT UNSIGNED NOT NULL,
+        file_path VARCHAR(255) NOT NULL,
+        file_storage_provider VARCHAR(50) DEFAULT 'local',
+        file_type ENUM ('id_proof', 'contract', 'other') DEFAULT 'other',
+        uploaded_by BIGINT UNSIGNED DEFAULT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (id),
+        INDEX idx_customer_attachments_customer_id (customer_id),
+        CONSTRAINT fk_customer_attachments_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
+        CONSTRAINT fk_customer_attachments_user FOREIGN KEY (uploaded_by) REFERENCES users (id) ON DELETE SET NULL
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE
+    customer_transactions (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        store_id BIGINT UNSIGNED NOT NULL,
+        customer_id BIGINT UNSIGNED NOT NULL,
+        transaction_code VARCHAR(100) NOT NULL,
+        transaction_type ENUM ('advance', 'payment', 'refund', 'adjustment') NOT NULL,
+        payment_type_id BIGINT UNSIGNED DEFAULT NULL,
+        related_reference_type VARCHAR(50) DEFAULT NULL,
+        related_reference_id BIGINT UNSIGNED DEFAULT NULL,
+        account_id BIGINT UNSIGNED DEFAULT NULL,
+        amount DECIMAL(15, 2) NOT NULL,
+        note TEXT DEFAULT NULL,
+        created_by BIGINT UNSIGNED DEFAULT NULL,
+        status ENUM ('pending', 'completed', 'cancelled') DEFAULT 'pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_customer_transactions_code (store_id, transaction_code),
+        INDEX idx_customer_transactions_store_id (store_id),
+        INDEX idx_customer_transactions_customer_id (customer_id),
+        INDEX idx_customer_transactions_payment_type_id (payment_type_id),
+        INDEX idx_customer_transactions_ref (related_reference_type, related_reference_id),
+        CONSTRAINT fk_customer_transactions_store FOREIGN KEY (store_id) REFERENCES stores (id) ON DELETE CASCADE,
+        CONSTRAINT fk_customer_transactions_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE CASCADE,
+        CONSTRAINT fk_customer_transactions_payment_type FOREIGN KEY (payment_type_id) REFERENCES payment_types (id) ON DELETE SET NULL,
+        CONSTRAINT fk_customer_transactions_account FOREIGN KEY (account_id) REFERENCES ac_accounts (id) ON DELETE SET NULL,
+        CONSTRAINT fk_customer_transactions_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 --  User Subscriptions (Multiple per user)
 CREATE TABLE
     user_subscriptions (
@@ -670,7 +750,15 @@ CREATE TABLE
         PRIMARY KEY (id),
         UNIQUE KEY uq_item_serial (item_id, serial_no),
         INDEX idx_item_serial_item (item_id),
-        CONSTRAINT fk_item_serial_item FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE
+        INDEX idx_item_serial_purchase (purchase_id),
+        INDEX idx_item_serial_purchase_return (purchase_return_id),
+        INDEX idx_item_serial_sales (sales_id),
+        INDEX idx_item_serial_sales_return (sales_return_id),
+        CONSTRAINT fk_item_serial_item FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE CASCADE,
+        CONSTRAINT fk_item_serial_purchase FOREIGN KEY (purchase_id) REFERENCES purchases (id) ON DELETE SET NULL,
+        CONSTRAINT fk_item_serial_purchase_return FOREIGN KEY (purchase_return_id) REFERENCES purchase_returns (id) ON DELETE SET NULL,
+        CONSTRAINT fk_item_serial_sales FOREIGN KEY (sales_id) REFERENCES sales (id) ON DELETE SET NULL,
+        CONSTRAINT fk_item_serial_sales_return FOREIGN KEY (sales_return_id) REFERENCES sales_returns (id) ON DELETE SET NULL
     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 -- WAREHOUSES
@@ -1477,6 +1565,75 @@ CREATE TABLE
         CONSTRAINT fk_pos_hold_items_tax FOREIGN KEY (tax_id) REFERENCES taxes (id) ON DELETE SET NULL
     );
 
+-- QUOTATIONS
+CREATE TABLE
+    quotations (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        store_id BIGINT UNSIGNED NOT NULL, -- FK → stores(id)
+        customer_id BIGINT UNSIGNED NOT NULL, -- FK → customers(id)
+        quote_number VARCHAR(100) NOT NULL UNIQUE,
+        quote_date DATE NOT NULL,
+        due_date DATE DEFAULT NULL,
+        quotation_status ENUM (
+            'draft',
+            'sent',
+            'accepted',
+            'rejected',
+            'expired'
+        ) DEFAULT 'draft',
+        payment_status ENUM ('pending', 'partial', 'paid') DEFAULT 'pending',
+        created_by BIGINT UNSIGNED NOT NULL, -- FK → users(id)
+        invoice_terms TEXT DEFAULT NULL,
+        status ENUM ('active', 'cancelled') DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_quotations_store_id (store_id),
+        INDEX idx_quotations_customer_id (customer_id),
+        CONSTRAINT fk_quotations_store FOREIGN KEY (store_id) REFERENCES stores (id) ON DELETE CASCADE,
+        CONSTRAINT fk_quotations_customer FOREIGN KEY (customer_id) REFERENCES customers (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_quotations_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE RESTRICT
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- QUOTATION ITEMS
+CREATE TABLE
+    quotation_items (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        quotation_id BIGINT UNSIGNED NOT NULL, -- FK → quotations(id)
+        item_id BIGINT UNSIGNED NOT NULL, -- FK → items(id)
+        quantity DECIMAL(15, 2) NOT NULL DEFAULT 1.00,
+        price_per_unit DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+        tax_id BIGINT UNSIGNED DEFAULT NULL, -- FK → taxes(id)
+        discount_type ENUM ('none', 'percent', 'fixed') DEFAULT 'none',
+        discount_value DECIMAL(15, 2) DEFAULT 0.00,
+        unit VARCHAR(50) DEFAULT NULL,
+        batch_no VARCHAR(100) DEFAULT NULL,
+        serial_numbers TEXT DEFAULT NULL,
+        status ENUM ('active', 'inactive') DEFAULT 'active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_quotation_items_quotation_id (quotation_id),
+        INDEX idx_quotation_items_item_id (item_id),
+        INDEX idx_quotation_items_tax_id (tax_id),
+        CONSTRAINT fk_quotation_items_quotation FOREIGN KEY (quotation_id) REFERENCES quotations (id) ON DELETE CASCADE,
+        CONSTRAINT fk_quotation_items_item FOREIGN KEY (item_id) REFERENCES items (id) ON DELETE RESTRICT,
+        CONSTRAINT fk_quotation_items_tax FOREIGN KEY (tax_id) REFERENCES taxes (id) ON DELETE SET NULL
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- QUOTATION ITEM CHARGES (optional, like sales_item_charges)
+CREATE TABLE
+    quotation_item_charges (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        quotation_item_id BIGINT UNSIGNED NOT NULL, -- FK → quotation_items(id)
+        charge_type ENUM ('other_charges', 'discount_to_all') NOT NULL,
+        input_value DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+        tax_id BIGINT UNSIGNED DEFAULT NULL, -- FK → taxes(id)
+        calculated_amount DECIMAL(15, 2) NOT NULL DEFAULT 0.00,
+        discount_type ENUM ('percent', 'fixed') DEFAULT 'fixed',
+        INDEX idx_quotation_item_charges_item_id (quotation_item_id),
+        CONSTRAINT fk_quotation_item_charges_item FOREIGN KEY (quotation_item_id) REFERENCES quotation_items (id) ON DELETE CASCADE,
+        CONSTRAINT fk_quotation_item_charges_tax FOREIGN KEY (tax_id) REFERENCES taxes (id) ON DELETE SET NULL
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 CREATE TABLE
     stores (
         store_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -1674,6 +1831,17 @@ CREATE TABLE
         CONSTRAINT fk_subscription_purchase_counter FOREIGN KEY (counter_id) REFERENCES store_counters (counter_id) ON DELETE SET NULL,
         CONSTRAINT fk_subscription_purchase_created_by FOREIGN KEY (created_by) REFERENCES users (user_id) ON DELETE SET NULL,
         CONSTRAINT fk_subscription_purchase_payment_type FOREIGN KEY (payment_type_id) REFERENCES payment_types (id) ON DELETE RESTRICT
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE
+    package_features (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        package_id BIGINT UNSIGNED NOT NULL,
+        feature_code VARCHAR(50) NOT NULL, -- e.g., android_app, windows_app
+        enabled TINYINT (1) NOT NULL DEFAULT 1,
+        UNIQUE KEY uq_package_feature (package_id, feature_code),
+        INDEX idx_package_features_package_id (package_id),
+        CONSTRAINT fk_package_features_package FOREIGN KEY (package_id) REFERENCES packages (id) ON DELETE CASCADE
     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
 CREATE TABLE

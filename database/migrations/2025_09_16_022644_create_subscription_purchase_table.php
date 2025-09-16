@@ -5,7 +5,8 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    public function up(): void {
+    public function up(): void
+    {
         Schema::create('subscription_purchase', function (Blueprint $table) {
             $table->bigIncrements('id');
             $table->unsignedBigInteger('store_id');
@@ -22,12 +23,6 @@ return new class extends Migration {
 
             $table->unique(['store_id', 'subscription_code'], 'uq_subscription_code');
 
-            $table->index('store_id', 'idx_subscription_purchase_store_id');
-            $table->index('package_id', 'idx_subscription_purchase_package_id');
-            $table->index('counter_id', 'idx_subscription_purchase_counter_id');
-            $table->index('created_by', 'idx_subscription_purchase_created_by');
-            $table->index('payment_type_id', 'idx_subscription_purchase_payment_type_id');
-
             $table->foreign('store_id')->references('id')->on('stores')->onDelete('cascade');
             $table->foreign('package_id')->references('id')->on('packages')->onDelete('restrict');
             $table->foreign('counter_id')->references('id')->on('store_counters')->onDelete('set null');
@@ -36,7 +31,8 @@ return new class extends Migration {
         });
     }
 
-    public function down(): void {
+    public function down(): void
+    {
         Schema::dropIfExists('subscription_purchase');
     }
 };
