@@ -17,9 +17,8 @@ RUN apt-get update && apt-get install -y \
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www
+COPY . /var/www
 
-# Copy Laravel files
-COPY ./greenbiller_app /var/www
 
 # Set permissions
 RUN chown -R www-data:www-data /var/www \
