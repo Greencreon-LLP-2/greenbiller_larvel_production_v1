@@ -228,6 +228,34 @@ CREATE TABLE
         CONSTRAINT fk_users_created_by FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
 
+CREATE TABLE
+    addresses (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+        address_type ENUM ('billing', 'shipping', 'other') DEFAULT 'shipping',
+        country_id BIGINT UNSIGNED NOT NULL,
+        state VARCHAR(100) DEFAULT NULL,
+        city VARCHAR(100) DEFAULT NULL,
+        postcode VARCHAR(20) DEFAULT NULL,
+        address_line TEXT DEFAULT NULL,
+        location_link VARCHAR(255) DEFAULT NULL,
+        is_default TINYINT (1) NOT NULL DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_addresses_country_id (country_id),
+        CONSTRAINT fk_addresses_country FOREIGN KEY (country_id) REFERENCES country_settings (id) ON DELETE RESTRICT
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+-- Polymorphic link table (strict 3NF) -- (15, 'customer', 2001) address 15 belongs to customer 2001.
+CREATE TABLE
+    address_links (
+        id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        address_id BIGINT UNSIGNED NOT NULL,
+        entity_type ENUM ('store', 'customer', 'supplier', 'user') NOT NULL,
+        entity_id BIGINT UNSIGNED NOT NULL,
+        CONSTRAINT fk_address_links_address FOREIGN KEY (address_id) REFERENCES addresses (id) ON DELETE CASCADE,
+        UNIQUE KEY uq_address_entity (address_id, entity_type, entity_id)
+    ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
 --  User Subscriptions (Multiple per user)
 CREATE TABLE
     user_subscriptions (
@@ -1450,27 +1478,6 @@ CREATE TABLE
     );
 
 CREATE TABLE
-    coupons (
-        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        store_id BIGINT UNSIGNED NOT NULL,
-        coupon_code VARCHAR(100) NOT NULL,
-        description TEXT DEFAULT NULL,
-        discount_type ENUM ('fixed', 'percentage') NOT NULL,
-        discount_value DECIMAL(12, 2) NOT NULL,
-        min_order_amount DECIMAL(12, 2) DEFAULT 0.00,
-        max_discount_amount DECIMAL(12, 2) DEFAULT NULL,
-        start_date DATE NOT NULL,
-        end_date DATE NOT NULL,
-        usage_limit INT DEFAULT NULL,
-        used_count INT DEFAULT 0,
-        status ENUM ('active', 'inactive', 'expired') DEFAULT 'active',
-        PRIMARY KEY (id),
-        UNIQUE KEY uq_coupon_code (coupon_code, store_id),
-        INDEX idx_coupons_store_id (store_id),
-        CONSTRAINT fk_coupons_store FOREIGN KEY (store_id) REFERENCES stores (id) ON DELETE CASCADE
-    );
-
-CREATE TABLE
     stores (
         store_id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         created_by BIGINT UNSIGNED NOT NULL, -- FK → users(user_id)
@@ -1520,6 +1527,27 @@ CREATE TABLE
         CONSTRAINT fk_user_stores_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
         CONSTRAINT fk_user_stores_store FOREIGN KEY (store_id) REFERENCES stores (store_id) ON DELETE CASCADE
     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_unicode_ci;
+
+CREATE TABLE
+    coupons (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        store_id BIGINT UNSIGNED NOT NULL,
+        coupon_code VARCHAR(100) NOT NULL,
+        description TEXT DEFAULT NULL,
+        discount_type ENUM ('fixed', 'percentage') NOT NULL,
+        discount_value DECIMAL(12, 2) NOT NULL,
+        min_order_amount DECIMAL(12, 2) DEFAULT 0.00,
+        max_discount_amount DECIMAL(12, 2) DEFAULT NULL,
+        start_date DATE NOT NULL,
+        end_date DATE NOT NULL,
+        usage_limit INT DEFAULT NULL,
+        used_count INT DEFAULT 0,
+        status ENUM ('active', 'inactive', 'expired') DEFAULT 'active',
+        PRIMARY KEY (id),
+        UNIQUE KEY uq_coupon_code (coupon_code, store_id),
+        INDEX idx_coupons_store_id (store_id),
+        CONSTRAINT fk_coupons_store FOREIGN KEY (store_id) REFERENCES stores (id) ON DELETE CASCADE
+    );
 
 CREATE TABLE
     store_counters (
@@ -1673,8 +1701,8 @@ CREATE TABLE
         store_id BIGINT UNSIGNED NOT NULL,
         created_by BIGINT UNSIGNED DEFAULT NULL,
         country_id BIGINT UNSIGNED NOT NULL,
-        state_id BIGINT UNSIGNED DEFAULT NULL,
-        city_id BIGINT UNSIGNED DEFAULT NULL,
+        state VARCHAR(50),
+        city VARCHAR(50),
         supplier_code VARCHAR(50) NOT NULL,
         supplier_name VARCHAR(255) NOT NULL,
         mobile VARCHAR(20) DEFAULT NULL,

@@ -6,3 +6,5 @@ sudo chown -R hp:hp /home/hp/Documents/GitHub/DOCKER/greenbiller_php_docker/gree
 
 2️⃣ Change permissions of the migrations folder
 sudo chmod -R 775 /home/hp/Documents/GitHub/DOCKER/greenbiller_php_docker/greenbiller_app/database/migrations
+
+drop all tables :: php artisan migrate:fresh

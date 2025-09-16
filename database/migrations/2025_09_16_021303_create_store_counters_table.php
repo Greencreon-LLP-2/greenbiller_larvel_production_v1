@@ -1,0 +1,37 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('store_counters', function (Blueprint $table) {
+            $table->bigIncrements('id');
+            $table->unsignedBigInteger('store_id');
+            $table->string('name', 100);
+            $table->string('counter_code', 50)->unique()->nullable();
+            $table->unsignedBigInteger('assigned_user_id')->nullable();
+            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->timestamps();
+
+            // Foreign keys
+            $table->foreign('store_id')
+                ->references('id')
+                ->on('stores')
+                ->onDelete('cascade');
+
+            $table->foreign('assigned_user_id')
+                ->references('id')
+                ->on('users')
+                ->nullOnDelete(); // Equivalent to allowing null when user deleted
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('store_counters');
+    }
+};
