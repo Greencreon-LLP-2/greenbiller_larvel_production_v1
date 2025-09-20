@@ -1,5 +1,6 @@
 sudo docker exec -it greenbiller_php bash
-sudo docker exec -it greenbiller_mysql mysql -u greenbiller_user -p
+sudo docker exec -it greenbiller_mysql mysql -u 
+greenbiller_user -p
 
 1️⃣ Change ownership of your project to your user
 sudo chown -R hp:hp /home/hp/Documents/GitHub/DOCKER/greenbiller_php_docker/greenbiller_app
@@ -8,3 +9,12 @@ sudo chown -R hp:hp /home/hp/Documents/GitHub/DOCKER/greenbiller_php_docker/gree
 sudo chmod -R 775 /home/hp/Documents/GitHub/DOCKER/greenbiller_php_docker/greenbiller_app/database/migrations
 
 drop all tables :: php artisan migrate:fresh
+
+larvel permission : chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache
+chmod -R 775 /var/www/storage /var/www/bootstrap/cache
+
+
+---------------------------
+run for each section after git pull
+
+docker compose up -d --build

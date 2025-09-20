@@ -18,8 +18,12 @@ class RegistrationApiController extends Controller
      * Send OTP
      */
     public function sendOtp(Request $request, SmsService $smsService)
-    {
-        $request->validate(['mobile' => 'required']);
+    { 
+        $mobile = $request->input('mobile');
+        
+        $request->validate([
+            'mobile' => 'required|string|digits:10',
+        ]);
 
         $otp = rand(1000, 9999);
         $expiresAt = now()->addMinutes(5);
@@ -39,9 +43,10 @@ class RegistrationApiController extends Controller
 
         return response()->json([
             'status' => true,
+            'mobile'=>$mobile,
             'message' => 'OTP sent successfully',
             'otp' => app()->environment('local') ? $otp : null,
-            'sms_response' => $smsResponse,
+            // 'sms_response' => $smsResponse,
         ]);
     }
 
@@ -144,6 +149,7 @@ class RegistrationApiController extends Controller
      */
     public function logout(Request $request)
     {
+        
         $request->user()->token()->revoke();
 
         return response()->json(['status' => true, 'message' => 'Logged out successfully']);
