@@ -34,7 +34,7 @@ services:
       MYSQL_USER: greenbiller_user
       MYSQL_PASSWORD: greenbiller_pass
     ports:
-      - "3306:3306"
+      - "3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
