@@ -24,5 +24,5 @@ COPY . /var/www
 RUN chown -R www-data:www-data /var/www \
     && chmod -R 755 /var/www
 
-EXPOSE 9000
+EXPOSE 3060
 CMD ["php-fpm"]
