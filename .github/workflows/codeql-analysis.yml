@@ -6,20 +6,32 @@ on:
   pull_request:
     branches: [ codeQL_Devops ]
   schedule:
-    - cron: '0 0 * * 0'  
+    - cron: '0 0 * * 0' 
 
 jobs:
   analyze:
     name: Analyze
     runs-on: ubuntu-latest
+
     steps:
+      # Step 1: Checkout the repository
       - name: Checkout repository
         uses: actions/checkout@v3
+
+      # Step 2: Initialize CodeQL
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
-          languages: python  # replace with your repo languages
+          # 'all' automatically detects all languages in your repo
+          languages: all
+
+      # Step 3: Autobuild (optional, for compiled languages)
       - name: Autobuild
         uses: github/codeql-action/autobuild@v2
+
+      # Step 4: Perform CodeQL analysis
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
+        with:
+          # Upload SARIF results to GitHub automatically
+          upload-sarif: true
