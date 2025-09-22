@@ -31,7 +31,7 @@ return new class extends Migration
             $table->timestamp('otp_expires_at')->nullable();
             $table->boolean('mobile_verified')->default(false);
             $table->boolean('email_verified')->default(false);
-            $table->enum('status', ['active', 'inactive', 'banned'])->default('active');
+            $table->enum('status', ['active','deleted','suspended', 'inactive', 'banned'])->default('active');
             $table->foreignId('created_by')->nullable()->constrained('users')->onDelete('set null');
             $table->string('referral_code', 100)->nullable();
             $table->string('license_key')->nullable();
