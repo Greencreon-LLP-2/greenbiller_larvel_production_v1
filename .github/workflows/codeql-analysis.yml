@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ codeQL_Devops ]
   schedule:
-    - cron: '0 0 * * 0' 
+    - cron: '0 0 * * 0'  # Runs weekly on Sunday at 00:00 UTC
 
 jobs:
   analyze:
@@ -22,10 +22,10 @@ jobs:
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v2
         with:
-          # 'all' automatically detects all languages in your repo
-          languages: all
+          # Replace with the languages used in your repo
+          languages: javascript, typescript, python
 
-      # Step 3: Autobuild (optional, for compiled languages)
+      # Step 3: Autobuild (needed for compiled languages)
       - name: Autobuild
         uses: github/codeql-action/autobuild@v2
 
@@ -33,5 +33,4 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v2
         with:
-          # Upload SARIF results to GitHub automatically
-          upload-sarif: true
+          upload-sarif: true  # Automatically uploads results to GitHub
