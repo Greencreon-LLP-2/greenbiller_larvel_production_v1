@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [ codeQL_Devops ]
   schedule:
-    - cron: 'weekly'
+    - cron: '0 0 * * 0'  
 
 jobs:
   analyze:
