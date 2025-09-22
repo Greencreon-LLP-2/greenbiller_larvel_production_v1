@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 
 class RegistrationApiController extends Controller
@@ -19,34 +20,36 @@ class RegistrationApiController extends Controller
      */
     public function sendOtp(Request $request, SmsService $smsService)
     {
-        $mobile = $request->input('mobile');
-
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'mobile' => 'required|string|digits:10',
         ]);
 
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $mobile = $request->mobile;
         $otp = rand(1000, 9999);
         $expiresAt = now()->addMinutes(5);
 
-        cache()->put('otp_'.$request->mobile, [
+        cache()->put("otp_{$mobile}", [
             'otp' => $otp,
             'expires_at' => $expiresAt,
         ], $expiresAt);
 
-        $message = str_replace(
-            '{code}',
-            $otp,
-            DB::table('core_settings')->value('sms_message_template') ?? 'Your OTP code is {code}'
-        );
+        $template = DB::table('core_settings')->value('sms_message_template') ?? 'Your OTP code is {code}';
+        $message = str_replace('{code}', $otp, $template);
 
-        $smsResponse = $smsService->send($request->mobile, $message);
+        $smsService->send($mobile, $message);
 
         return response()->json([
             'status' => true,
-            'mobile' => $mobile,
             'message' => 'OTP sent successfully',
-            'otp' => app()->environment('local') ? $otp : null,
-            // 'sms_response' => $smsResponse,
+            'mobile' => $mobile,
+            'otp' => app()->environment('local') ? $otp : null, // expose only in local/dev
         ]);
     }
 
@@ -55,22 +58,27 @@ class RegistrationApiController extends Controller
      */
     public function register(Request $request)
     {
-
         $validator = Validator::make($request->all(), [
             'full_name' => 'required|string|max:255',
             'email' => 'nullable|email|unique:users,email',
-            'mobile' => 'required|unique:users,mobile',
-            'otp' => 'required',
+            'mobile' => 'required|string|unique:users,mobile',
+            'otp' => 'required|string',
             'password' => 'required|string|min:8|confirmed',
         ]);
 
         if ($validator->fails()) {
-            return response()->json(['status' => false, 'errors' => $validator->errors()], 422);
+            return response()->json([
+                'status' => false,
+                'errors' => $validator->errors(),
+            ], 422);
         }
 
-        $cached = cache()->get('otp_'.$request->mobile);
+        $cached = cache()->get("otp_{$request->mobile}");
         if (! $cached || $cached['otp'] != $request->otp) {
-            return response()->json(['status' => false, 'message' => 'Invalid or expired OTP'], 400);
+            return response()->json([
+                'status' => false,
+                'message' => 'Invalid or expired OTP',
+            ], 400);
         }
 
         DB::beginTransaction();
@@ -88,9 +96,8 @@ class RegistrationApiController extends Controller
             ]);
 
             DB::commit();
-            cache()->forget('otp_'.$request->mobile);
+            cache()->forget("otp_{$request->mobile}");
 
-            // Generate Passport JWT token
             $token = $user->createToken('Personal Access Token')->accessToken;
 
             return response()->json([
@@ -98,13 +105,16 @@ class RegistrationApiController extends Controller
                 'message' => 'User registered successfully',
                 'access_token' => $token,
                 'token_type' => 'Bearer',
-                'data' => $user,
+                'data' => $user->makeHidden(['password', 'remember_token']),
             ], 201);
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error('Registration error: '.$e->getMessage());
 
-            return response()->json(['status' => false, 'message' => $e->getMessage()], 500);
+            return response()->json([
+                'status' => false,
+                'message' => 'Registration failed',
+            ], 500);
         }
     }
 
@@ -127,7 +137,6 @@ class RegistrationApiController extends Controller
             ], 422);
         }
 
-        // Require at least one identifier
         if (! $request->email && ! $request->mobile) {
             return response()->json([
                 'status' => false,
@@ -135,7 +144,6 @@ class RegistrationApiController extends Controller
             ], 422);
         }
 
-        // Require at least one authentication method
         if (! $request->password && ! $request->otp) {
             return response()->json([
                 'status' => false,
@@ -143,16 +151,10 @@ class RegistrationApiController extends Controller
             ], 422);
         }
 
-        // Find user by email or mobile
-        $userQuery = User::query();
-        if ($request->email) {
-            $userQuery->where('email', $request->email);
-        }
-        if ($request->mobile) {
-            $userQuery->orWhere('mobile', $request->mobile);
-        }
-
-        $user = $userQuery->first();
+        $user = User::query()
+            ->when($request->email, fn ($q) => $q->where('email', $request->email))
+            ->when($request->mobile, fn ($q) => $q->orWhere('mobile', $request->mobile))
+            ->first();
 
         if (! $user) {
             return response()->json([
@@ -161,7 +163,6 @@ class RegistrationApiController extends Controller
             ], 404);
         }
 
-        // Authenticate using OTP
         if ($request->otp) {
             $cacheKey = 'otp_'.($request->mobile ?? $request->email);
             $cached = cache()->get($cacheKey);
@@ -171,9 +172,7 @@ class RegistrationApiController extends Controller
                     'message' => 'Invalid or expired OTP',
                 ], 400);
             }
-        }
-        // Authenticate using password
-        elseif ($request->password) {
+        } elseif ($request->password) {
             if (! Hash::check($request->password, $user->password)) {
                 return response()->json([
                     'status' => false,
@@ -182,7 +181,6 @@ class RegistrationApiController extends Controller
             }
         }
 
-        // Check user status
         if ($user->status !== 'active') {
             $statusMessages = [
                 'deleted' => 'Account has been deleted',
@@ -191,36 +189,30 @@ class RegistrationApiController extends Controller
                 'banned' => 'Account is banned',
             ];
 
-            $message = $statusMessages[$user->status] ?? 'Account inactive';
-
             return response()->json([
                 'status' => false,
-                'message' => $message,
+                'message' => $statusMessages[$user->status] ?? 'Account inactive',
             ], 403);
         }
 
-        // Create token
         $token = $user->createToken('Personal Access Token')->accessToken;
-
-        // Exclude sensitive fields
-        $userData = $user->makeHidden(['password', 'remember_token', 'otp']);
 
         return response()->json([
             'status' => true,
             'message' => 'Login successful',
             'access_token' => $token,
             'token_type' => 'Bearer',
-            'data' => $userData,
+            'data' => $user->makeHidden(['password', 'remember_token']),
         ]);
     }
+
     /**
      * Logout
      */
     public function logout(Request $request)
     {
         /** @var \Laravel\Passport\Token $token */
-        $token = $request->user()->token();
-        $token->revoke();
+        $request->user()->token()->revoke();
 
         return response()->json([
             'status' => true,
@@ -228,68 +220,186 @@ class RegistrationApiController extends Controller
         ]);
     }
 
+    /**
+     * Update user status
+     */
     public function statusUpdate(Request $request)
     {
-       
-        $request->validate([
-            'user_id' => 'required|integer|min:1|max:1000000',
+        $user = $request->user();
+        $validator = Validator::make($request->all(), [
             'status' => 'required|in:active,deleted,suspended,inactive,banned',
         ]);
-        
-        $userId = $request->input('user_id');
-        $status = $request->input('status');
+
+        if ($validator->fails()) {
+            return response()->json([
+                'status' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
 
         try {
-           
-            $user = User::findOrFail($userId);
-
-            // Revoke all existing tokens
             $user->tokens()->update(['revoked' => true]);
-
-            // Update status
-            $user->status = $status;
+            $user->status = $request->status;
             $user->save();
 
             return response()->json([
                 'status' => true,
-                'message' => "User status updated to {$status}",
-                'userId' => $userId,
+                'message' => "User status updated to {$request->status}",
+                'user_id' => $user->id,
+            ]);
+        } catch (\Exception $e) {
+            Log::error('Status update error: '.$e->getMessage());
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Status update failed',
+            ], 500);
+        }
+    }
+
+    /**
+     * Delete user by Admin
+     */
+    public function adminUserDelete($id)
+    {
+        try {
+            $user = User::findOrFail($id);
+
+            // Prevent admin from deleting themselves
+            if ($user->id === auth()->id()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Cannot delete your own account',
+                ], 422);
+            }
+
+            $user->delete();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'User deleted successfully',
+                'user_id' => $id,
             ]);
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status' => false,
                 'message' => 'User not found',
-                'user_id' => $userId,
+                'user_id' => $id,
             ], 404);
         }
     }
 
-    public function adminUserdelete(Request $request)
+    /**
+     * Check user existence
+     */
+    public function checkUserExistence(Request $request)
     {
-        $userId = $request->input('user_id');
-
-        $request->validate([
-            'user_id' => 'required|integer|min:1|max:1000000',
+        $validator = Validator::make($request->all(), [
+            'email' => 'nullable|email',
+            'mobile' => 'nullable|string',
         ]);
-        try {
-            $user = User::findOrFail($userId);
-            $user->delete();
 
-            // $request->user()->tokens()->update(['revoked' => true]);
-            // $user->status='deleted';
-            // $user->save();
-            return response()->json([
-                'status' => true,
-                'message' => 'User status updated to deleted',
-                'userId' => $userId,
-            ]);
-        } catch (ModelNotFoundException $e) {
-            // Failure: user not found
+        if ($validator->fails()) {
             return response()->json([
                 'status' => false,
-                'message' => 'User not found',
-                'user_id' => $userId,
-            ], 404);
+                'errors' => $validator->errors(),
+            ], 422);
         }
+
+        if (! $request->email && ! $request->mobile) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Email or mobile number is required',
+            ], 422);
+        }
+
+        $user = User::query()
+            ->when($request->email, fn ($q) => $q->where('email', $request->email))
+            ->when($request->mobile, fn ($q) => $q->orWhere('mobile', $request->mobile))
+            ->first();
+
+        if ($user) {
+            return response()->json([
+                'status' => true,
+                'message' => 'User exists',
+                'user_id' => $user->id,
+            ]);
+        }
+
+        return response()->json([
+            'status' => false,
+            'message' => 'User not found',
+        ], 404);
+    }
+
+    public function updateProfile(Request $request)
+    {
+       
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'full_name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,'.$user->id,
+            'mobile' => 'sometimes|string|unique:users,mobile,'.$user->id,
+            'password' => 'sometimes|string|min:8|confirmed',
+            'dob' => 'sometimes|date',
+            'whatsapp_no' => 'sometimes|string|max:20',
+            'zone' => 'sometimes|string|max:255',
+            'profile_image' => 'sometimes|image|mimes:jpg,jpeg,png|max:2048',
+        ]);
+
+        try {
+            // Handle password hashing
+            if (! empty($validated['password'])) {
+                $validated['password'] = Hash::make($validated['password']);
+            }
+
+            // Handle profile image upload - FIXED
+            if ($request->hasFile('profile_image')) {
+                $file = $request->file('profile_image');
+                $filename = uniqid('profile_').'.'.$file->getClientOriginalExtension();
+
+                // Store in PUBLIC disk (storage/app/public/profile_images)
+                $path = $file->storeAs('profile_images', $filename, 'private');
+
+                // Delete old profile image if exists
+                if ($user->profile_image && Storage::disk('private')->exists($user->profile_image)) {
+                    Storage::disk('private')->delete($user->profile_image);
+                }
+
+                $validated['profile_image'] = $path; // This should save: 'profile_images/filename.jpg'
+            }
+
+         
+
+            $user->update($validated);
+
+            // Refresh user data from database
+            $user->refresh();
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Profile updated successfully',
+                'data' => $user->makeHidden(['password', 'remember_token', 'otp']),
+            ]);
+
+        } catch (\Exception $e) {
+
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Profile update failed: '.$e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getProfile(Request $request)
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'status' => true,
+            'data' => $user->makeHidden(['password', 'remember_token', 'otp']),
+        ]);
     }
 }
