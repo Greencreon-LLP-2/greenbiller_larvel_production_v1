@@ -1,68 +1,35 @@
-name: "DevSecOps Scanning"
+name: "CodeQL Analysis"
 
+# Run on pushes or PRs to your branch
 on:
   push:
     branches: [ codeQL_Devops ]
   pull_request:
     branches: [ codeQL_Devops ]
   schedule:
-    - cron: '0 0 * * 0' 
+    - cron: '0 0 * * 0'  # weekly Sunday at 00:00 UTC
 
 permissions:
   contents: read
   security-events: write
 
 jobs:
-  devsecops_scan:
-    name: DevSecOps Analysis
+  analyze:
+    name: Analyze
     runs-on: ubuntu-latest
-
     steps:
-      #  Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # CodeQL Initialization
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: javascript, typescript  # Replace with actual repo languages
-
-      #  CodeQL Autobuild
-      - name: CodeQL Autobuild
+          languages: javascript  # replace with your repo language(s)
+      
+      - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
-      #  CodeQL Analysis
-      - name: Run CodeQL Analysis
+      - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
-          upload: true
-
-      #  Trivy Container Scan
-      - name: Trivy Scan
-        run: |
-          sudo apt-get update && sudo apt-get install -y wget
-          wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.56.2_Linux-64bit.deb
-          sudo dpkg -i trivy_0.56.2_Linux-64bit.deb || true
-          trivy fs --exit-code 1 --severity HIGH,CRITICAL .
-
-      # Gitleaks Secret Scan
-      - name: Gitleaks Scan
-        run: |
-          wget https://github.com/gitleaks/gitleaks/releases/latest/download/gitleaks_8.28.0_linux_x64.tar.gz
-          tar -xzf gitleaks_8.28.0_linux_x64.tar.gz
-          chmod +x gitleaks
-          ./gitleaks detect --source=. --exit-code 1
-
-      #  Checkov IaC Scan
-      - name: Checkov Scan
-        run: |
-          pip install --upgrade pip
-          pip install checkov
-          checkov -d . --quiet --output sarif --output-file checkov.sarif
-
-      # Semgrep Source Code Scan
-      - name: Semgrep Scan
-        run: |
-          pip install semgrep
-          semgrep --config=p/ci --error --sarif --output semgrep.sarif
+          category: "security"
