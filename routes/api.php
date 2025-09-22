@@ -6,6 +6,7 @@ use Laravel\Passport\Http\Controllers\AuthorizedAccessTokenController;
 use Laravel\Passport\Http\Controllers\TransientTokenController;
 use Illuminate\Support\Facades\Route;
 
+//public 
 Route::post('/oauth/token', [AccessTokenController::class, 'issueToken']);
 Route::get('/oauth/tokens', [AuthorizedAccessTokenController::class, 'forUser']);
 Route::delete('/oauth/tokens/{token_id}', [AuthorizedAccessTokenController::class, 'destroy']);

@@ -38,7 +38,7 @@ class Store extends Model
         'timezone_id',
         'date_format',
         'time_format',
-        'status',
+        'status',   
     ];
 
     public function creator()
