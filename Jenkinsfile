@@ -55,7 +55,10 @@ pipeline {
 
         stage('IaC Scanning - Checkov') {
             when {
-                expression { fileExists('terraform') || fileExists('kubernetes') }
+                anyOf {
+                    expression { fileExists('terraform') }
+                    expression { fileExists('kubernetes') }
+                }
             }
             steps {
                 sh """
@@ -68,8 +71,45 @@ pipeline {
         stage('Reporting Summary') {
             steps {
                 echo "✅ All scans completed. Reports are stored in: ${REPORT_DIR}"
-                echo "Review JSON reports in Jenkins artifacts for detailed findings."
+                echo "📂 Check Jenkins artifacts tab for detailed JSON reports."
             }
+        }
+    }
+
+    post {
+        failure {
+            emailext (
+                to: "shilpigoyal7129@gmail.com",
+                subject: "🚨 Jenkins Build Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+Hello Shilpi,
+
+The Jenkins build *${env.JOB_NAME}* (#${env.BUILD_NUMBER}) has **FAILED** due to security scan issues.
+
+🔎 You can review the reports here:
+${env.BUILD_URL}artifact/${REPORT_DIR}/
+
+Best Regards,  
+🔐 Jenkins DevSecOps Pipeline
+"""
+            )
+        }
+        success {
+            emailext (
+                to: "shilpigoyal7129@gmail.com",
+                subject: "✅ Jenkins Build Passed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                body: """
+Hello Shilpi,
+
+Good news! The Jenkins build *${env.JOB_NAME}* (#${env.BUILD_NUMBER}) has **PASSED**.
+
+📂 Reports are available here:
+${env.BUILD_URL}artifact/${REPORT_DIR}/
+
+Regards,  
+🔐 Jenkins DevSecOps Pipeline
+"""
+            )
         }
     }
 }
