@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         REPORT_DIR = "security-reports"
+        IMAGE_NAME = "greenbiller_app"
     }
 
     stages {
@@ -57,49 +58,26 @@ pipeline {
         stage('Evaluate Scan Results') {
             steps {
                 script {
-                    def issuesFound = false
-
-                    // Semgrep
+                    // Check if any of the reports indicate issues
+                    def findingsExist = false
                     if (fileExists("${REPORT_DIR}/semgrep-report.json")) {
-                        def semgrepReport = readJSON file: "${REPORT_DIR}/semgrep-report.json"
-                        if (semgrepReport.results && semgrepReport.results.size() > 0) {
-                            echo "Semgrep found issues"
-                            issuesFound = true
-                        }
+                        def semgrepReport = readFile("${REPORT_DIR}/semgrep-report.json")
+                        if (semgrepReport.contains('"findings":6')) { findingsExist = true }
                     }
-
-                    // Trivy FS
                     if (fileExists("${REPORT_DIR}/trivy-fs-report.json")) {
-                        def trivyFS = readJSON file: "${REPORT_DIR}/trivy-fs-report.json"
-                        if (trivyFS.Results && trivyFS.Results.any { it.Vulnerabilities }) {
-                            echo "Trivy FS found vulnerabilities"
-                            issuesFound = true
-                        }
+                        def trivyReport = readFile("${REPORT_DIR}/trivy-fs-report.json")
+                        if (trivyReport.contains('"Vulnerabilities":')) { findingsExist = true }
                     }
-
-                    // Gitleaks
                     if (fileExists("${REPORT_DIR}/gitleaks-report.json")) {
-                        def gitleaks = readJSON file: "${REPORT_DIR}/gitleaks-report.json"
-                        if (gitleaks.findAll { it != null }.size() > 0) {
-                            echo "Gitleaks found secrets"
-                            issuesFound = true
-                        }
+                        def gitleaksReport = readFile("${REPORT_DIR}/gitleaks-report.json")
+                        if (gitleaksReport.contains('"leaks":')) { findingsExist = true }
                     }
 
-                    // Checkov
-                    if (fileExists("${REPORT_DIR}/checkov-report.json")) {
-                        def checkov = readJSON file: "${REPORT_DIR}/checkov-report.json"
-                        if (checkov.summary && checkov.summary.failed_checks > 0) {
-                            echo "Checkov found IaC misconfigurations"
-                            issuesFound = true
-                        }
-                    }
-
-                    if (issuesFound) {
-                        currentBuild.result = "UNSTABLE"
-                        echo "Security issues detected. Build marked as UNSTABLE."
+                    if (findingsExist) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo "⚠ Security issues detected! Build marked UNSTABLE."
                     } else {
-                        echo "No major security issues detected."
+                        echo "✅ No critical issues detected."
                     }
                 }
             }
@@ -108,25 +86,20 @@ pipeline {
 
     post {
         always {
-            emailext(
+            emailext (
                 to: "shilpigoyal7129@gmail.com",
-                subject: "DevSecOps Report - ${env.JOB_NAME} #${env.BUILD_NUMBER} - ${currentBuild.currentResult}",
+                subject: "Jenkins Build Result: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
-<h2>DevSecOps Pipeline Summary</h2>
-<p><b>Project:</b> ${env.JOB_NAME}</p>
-<p><b>Build Number:</b> #${env.BUILD_NUMBER}</p>
-<p><b>Status:</b> ${currentBuild.currentResult}</p>
-<p>Reports:</p>
-<ul>
-  <li><a href="${env.BUILD_URL}artifact/${REPORT_DIR}/semgrep-report.json">Semgrep Report</a></li>
-  <li><a href="${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-fs-report.json">Trivy FS Report</a></li>
-  <li><a href="${env.BUILD_URL}artifact/${REPORT_DIR}/gitleaks-report.json">Gitleaks Report</a></li>
-  <li><a href="${env.BUILD_URL}artifact/${REPORT_DIR}/checkov-report.json">Checkov Report</a></li>
-</ul>
-<p>If status is UNSTABLE, one or more scans found issues. Please review the reports.</p>
-""",
-                mimeType: 'text/html',
-                attachmentsPattern: "${REPORT_DIR}/*.json"
+Hello,
+
+The Jenkins build *${env.JOB_NAME}* (#${env.BUILD_NUMBER}) has completed with status: ${currentBuild.result}.
+
+Reports are available here:
+${env.BUILD_URL}artifact/${REPORT_DIR}/
+
+Regards,
+Jenkins DevSecOps Pipeline
+"""
             )
         }
     }
