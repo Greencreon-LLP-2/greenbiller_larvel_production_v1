@@ -16,7 +16,7 @@ pipeline {
         stage('SAST - Semgrep') {
             steps {
                 sh """
-                    semgrep --config auto . --json > ${REPORT_DIR}/semgrep-report.json || true
+                    semgrep --config auto . --json > ${REPORT_DIR}/semgrep-report.json
                 """
                 archiveArtifacts artifacts: "${REPORT_DIR}/semgrep-report.json", fingerprint: true
             }
@@ -25,7 +25,8 @@ pipeline {
         stage('Dependency Scanning - Trivy (Filesystem)') {
             steps {
                 sh """
-                    trivy fs --exit-code 0 --severity HIGH,CRITICAL --format json -o ${REPORT_DIR}/trivy-fs-report.json . || true
+                    trivy fs --exit-code 1 --severity HIGH,CRITICAL \
+                    --format json -o ${REPORT_DIR}/trivy-fs-report.json .
                 """
                 archiveArtifacts artifacts: "${REPORT_DIR}/trivy-fs-report.json", fingerprint: true
             }
@@ -34,7 +35,9 @@ pipeline {
         stage('Secret Scanning - Gitleaks') {
             steps {
                 sh """
-                    gitleaks detect --source . --report-path=${REPORT_DIR}/gitleaks-report.json --report-format=json || true
+                    gitleaks detect --source . \
+                    --report-path=${REPORT_DIR}/gitleaks-report.json \
+                    --report-format=json --exit-code 1
                 """
                 archiveArtifacts artifacts: "${REPORT_DIR}/gitleaks-report.json", fingerprint: true
             }
@@ -46,8 +49,9 @@ pipeline {
             }
             steps {
                 sh """
-                    docker build -t ${IMAGE_NAME}:${BUILD_ID} . || true
-                    trivy image --exit-code 0 --severity HIGH,CRITICAL --format json -o ${REPORT_DIR}/trivy-image-report.json ${IMAGE_NAME}:${BUILD_ID} || true
+                    docker build -t ${IMAGE_NAME}:${BUILD_ID} .
+                    trivy image --exit-code 1 --severity HIGH,CRITICAL \
+                    --format json -o ${REPORT_DIR}/trivy-image-report.json ${IMAGE_NAME}:${BUILD_ID}
                 """
                 archiveArtifacts artifacts: "${REPORT_DIR}/trivy-image-report.json", fingerprint: true
             }
@@ -62,7 +66,7 @@ pipeline {
             }
             steps {
                 sh """
-                    checkov -d . -o json > ${REPORT_DIR}/checkov-report.json || true
+                    checkov -d . -o json > ${REPORT_DIR}/checkov-report.json
                 """
                 archiveArtifacts artifacts: "${REPORT_DIR}/checkov-report.json", fingerprint: true
             }
@@ -80,14 +84,20 @@ pipeline {
         failure {
             emailext (
                 to: "shilpigoyal7129@gmail.com",
-                subject: "🚨 Jenkins Build Failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                subject: "🚨 Jenkins Build FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
 Hello Shilpi,
 
 The Jenkins build *${env.JOB_NAME}* (#${env.BUILD_NUMBER}) has **FAILED** due to security scan issues.
 
-🔎 You can review the reports here:
-${env.BUILD_URL}artifact/${REPORT_DIR}/
+🔎 Reports are available here:
+- Semgrep: ${env.BUILD_URL}artifact/${REPORT_DIR}/semgrep-report.json
+- Trivy FS: ${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-fs-report.json
+- Gitleaks: ${env.BUILD_URL}artifact/${REPORT_DIR}/gitleaks-report.json
+- Trivy Image: ${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-image-report.json
+- Checkov: ${env.BUILD_URL}artifact/${REPORT_DIR}/checkov-report.json
+
+🔗 Build Details: ${env.BUILD_URL}
 
 Best Regards,  
 🔐 Jenkins DevSecOps Pipeline
@@ -97,14 +107,20 @@ Best Regards,
         success {
             emailext (
                 to: "shilpigoyal7129@gmail.com",
-                subject: "✅ Jenkins Build Passed: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                subject: "✅ Jenkins Build PASSED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: """
 Hello Shilpi,
 
-Good news! The Jenkins build *${env.JOB_NAME}* (#${env.BUILD_NUMBER}) has **PASSED**.
+Good news! The Jenkins build *${env.JOB_NAME}* (#${env.BUILD_NUMBER}) has **PASSED** with no HIGH/CRITICAL issues.
 
 📂 Reports are available here:
-${env.BUILD_URL}artifact/${REPORT_DIR}/
+- Semgrep: ${env.BUILD_URL}artifact/${REPORT_DIR}/semgrep-report.json
+- Trivy FS: ${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-fs-report.json
+- Gitleaks: ${env.BUILD_URL}artifact/${REPORT_DIR}/gitleaks-report.json
+- Trivy Image: ${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-image-report.json
+- Checkov: ${env.BUILD_URL}artifact/${REPORT_DIR}/checkov-report.json
+
+🔗 Build Details: ${env.BUILD_URL}
 
 Regards,  
 🔐 Jenkins DevSecOps Pipeline
