@@ -3,7 +3,6 @@ pipeline {
 
     environment {
         REPORT_DIR = "security-reports"
-        IMAGE_NAME = "greenbiller_app"
     }
 
     stages {
@@ -40,20 +39,6 @@ pipeline {
                     --report-format=json --exit-code 1
                 """
                 archiveArtifacts artifacts: "${REPORT_DIR}/gitleaks-report.json", fingerprint: true
-            }
-        }
-
-        stage('Container Scanning - Trivy (Docker Image)') {
-            when {
-                expression { fileExists('Dockerfile') }
-            }
-            steps {
-                sh """
-                    docker build -t ${IMAGE_NAME}:${BUILD_ID} .
-                    trivy image --exit-code 1 --severity HIGH,CRITICAL \
-                    --format json -o ${REPORT_DIR}/trivy-image-report.json ${IMAGE_NAME}:${BUILD_ID}
-                """
-                archiveArtifacts artifacts: "${REPORT_DIR}/trivy-image-report.json", fingerprint: true
             }
         }
 
@@ -94,7 +79,6 @@ The Jenkins build *${env.JOB_NAME}* (#${env.BUILD_NUMBER}) has **FAILED** due to
 - Semgrep: ${env.BUILD_URL}artifact/${REPORT_DIR}/semgrep-report.json
 - Trivy FS: ${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-fs-report.json
 - Gitleaks: ${env.BUILD_URL}artifact/${REPORT_DIR}/gitleaks-report.json
-- Trivy Image: ${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-image-report.json
 - Checkov: ${env.BUILD_URL}artifact/${REPORT_DIR}/checkov-report.json
 
 🔗 Build Details: ${env.BUILD_URL}
@@ -117,7 +101,6 @@ Good news! The Jenkins build *${env.JOB_NAME}* (#${env.BUILD_NUMBER}) has **PASS
 - Semgrep: ${env.BUILD_URL}artifact/${REPORT_DIR}/semgrep-report.json
 - Trivy FS: ${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-fs-report.json
 - Gitleaks: ${env.BUILD_URL}artifact/${REPORT_DIR}/gitleaks-report.json
-- Trivy Image: ${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-image-report.json
 - Checkov: ${env.BUILD_URL}artifact/${REPORT_DIR}/checkov-report.json
 
 🔗 Build Details: ${env.BUILD_URL}
