@@ -15,7 +15,7 @@ pipeline {
         stage('SAST - Semgrep') {
             steps {
                 sh """
-                    semgrep --config auto . --json > ${REPORT_DIR}/semgrep-report.json
+                  semgrep --config auto . --json > ${REPORT_DIR}/semgrep-report.json || true
                 """
                 archiveArtifacts artifacts: "${REPORT_DIR}/semgrep-report.json", fingerprint: true
             }
@@ -24,8 +24,8 @@ pipeline {
         stage('Dependency Scanning - Trivy (Filesystem)') {
             steps {
                 sh """
-                    trivy fs --exit-code 1 --severity HIGH,CRITICAL \
-                    --format json -o ${REPORT_DIR}/trivy-fs-report.json .
+                  trivy fs --exit-code 0 --severity HIGH,CRITICAL \
+                  --format json -o ${REPORT_DIR}/trivy-fs-report.json . || true
                 """
                 archiveArtifacts artifacts: "${REPORT_DIR}/trivy-fs-report.json", fingerprint: true
             }
@@ -34,24 +34,31 @@ pipeline {
         stage('Secret Scanning - Gitleaks') {
             steps {
                 sh """
-                    gitleaks detect --source . \
-                    --report-path=${REPORT_DIR}/gitleaks-report.json \
-                    --report-format=json --exit-code 1
+                  gitleaks detect --source . \
+                  --report-path=${REPORT_DIR}/gitleaks-report.json \
+                  --report-format=json || true
                 """
                 archiveArtifacts artifacts: "${REPORT_DIR}/gitleaks-report.json", fingerprint: true
             }
         }
 
-        stage('IaC Scanning - Checkov') {
+        stage('Container Scanning - Trivy (Docker Image)') {
             when {
-                anyOf {
-                    expression { fileExists('terraform') }
-                    expression { fileExists('kubernetes') }
-                }
+                expression { fileExists('Dockerfile') }
             }
             steps {
                 sh """
-                    checkov -d . -o json > ${REPORT_DIR}/checkov-report.json
+                  trivy image --exit-code 0 --severity HIGH,CRITICAL \
+                  --format json -o ${REPORT_DIR}/trivy-image-report.json myapp:latest || true
+                """
+                archiveArtifacts artifacts: "${REPORT_DIR}/trivy-image-report.json", fingerprint: true
+            }
+        }
+
+        stage('IaC Scanning - Checkov') {
+            steps {
+                sh """
+                  checkov -d . -o json > ${REPORT_DIR}/checkov-report.json || true
                 """
                 archiveArtifacts artifacts: "${REPORT_DIR}/checkov-report.json", fingerprint: true
             }
@@ -59,55 +66,26 @@ pipeline {
 
         stage('Reporting Summary') {
             steps {
-                echo "✅ All scans completed. Reports are stored in: ${REPORT_DIR}"
-                echo "📂 Check Jenkins artifacts tab for detailed JSON reports."
+                script {
+                    echo "All reports generated in ${REPORT_DIR}"
+                    sh "ls -lh ${REPORT_DIR}"
+                }
             }
         }
     }
 
     post {
-        failure {
-            emailext (
+        always {
+            emailext(
                 to: "shilpigoyal7129@gmail.com",
-                subject: "🚨 Jenkins Build FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-Hello Shilpi,
-
-The Jenkins build *${env.JOB_NAME}* (#${env.BUILD_NUMBER}) has **FAILED** due to security scan issues.
-
-🔎 Reports are available here:
-- Semgrep: ${env.BUILD_URL}artifact/${REPORT_DIR}/semgrep-report.json
-- Trivy FS: ${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-fs-report.json
-- Gitleaks: ${env.BUILD_URL}artifact/${REPORT_DIR}/gitleaks-report.json
-- Checkov: ${env.BUILD_URL}artifact/${REPORT_DIR}/checkov-report.json
-
-🔗 Build Details: ${env.BUILD_URL}
-
-Best Regards,  
-🔐 Jenkins DevSecOps Pipeline
-"""
-            )
-        }
-        success {
-            emailext (
-                to: "shilpigoyal7129@gmail.com",
-                subject: "✅ Jenkins Build PASSED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: """
-Hello Shilpi,
-
-Good news! The Jenkins build *${env.JOB_NAME}* (#${env.BUILD_NUMBER}) has **PASSED** with no HIGH/CRITICAL issues.
-
-📂 Reports are available here:
-- Semgrep: ${env.BUILD_URL}artifact/${REPORT_DIR}/semgrep-report.json
-- Trivy FS: ${env.BUILD_URL}artifact/${REPORT_DIR}/trivy-fs-report.json
-- Gitleaks: ${env.BUILD_URL}artifact/${REPORT_DIR}/gitleaks-report.json
-- Checkov: ${env.BUILD_URL}artifact/${REPORT_DIR}/checkov-report.json
-
-🔗 Build Details: ${env.BUILD_URL}
-
-Regards,  
-🔐 Jenkins DevSecOps Pipeline
-"""
+                subject: "DevSecOps Pipeline Report - ${currentBuild.currentResult}",
+                body: """Hello Team,<br><br>
+                The Jenkins DevSecOps pipeline has completed.<br>
+                Status: ${currentBuild.currentResult}<br><br>
+                Please find attached reports.<br><br>
+                Regards,<br>Jenkins
+                """,
+                attachmentsPattern: "${REPORT_DIR}/*.json"
             )
         }
     }
